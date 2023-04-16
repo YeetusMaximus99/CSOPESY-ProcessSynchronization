@@ -43,15 +43,12 @@ class FittingRoom:
             print(f"{threading.get_ident()} - {self.current_color}")
     def leave(self):
         with self.lock:
-            while self.current_count < self.slots:
-                self.blue_condition.wait()
-                self.green_condition.wait()
             if self.current_count == self.slots or (self.total_green == 0 and self.current_color == 'green') or (self.total_blue == 0 and self.current_color == 'blue'):  
                         self.past_color = self.current_color
                         if self.current_color == "blue":
                             self.current_color = "green"
                             self.green_condition.notify_all()
-                        else:
+                        elif self.current_color == "green":
                             self.current_color = "blue"
                             self.blue_condition.notify_all()
                         self.current_count = 0
