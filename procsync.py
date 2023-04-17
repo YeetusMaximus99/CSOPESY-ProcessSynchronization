@@ -1,79 +1,140 @@
 import threading
-import logging
+import time
+import queue
 
-logging.basicConfig(level=logging.DEBUG,
-                    format='(%(threadName)-9s) %(message)s',)
-class FittingRoom:
-    def __init__(self, n,blue,green):
-        self.slots = n
-        self.blue_count = 0
-        self.green_count = 0
-        self.lock = threading.Lock()
-        self.blue_condition = threading.Condition(self.lock)
-        self.green_condition = threading.Condition(self.lock)
-        self.current_color = None
-        self.current_count = 0
-        self.total_green = green
-        self.total_blue = blue
-        self.past_color= None
-        self.next_color = None
-    def enter(self):
-        with self.lock:
-            if self.current_color is None:
-                self.current_color = "blue"
-                print(f"{self.current_color} only")
-            if self.current_color == "blue" and self.green_count == 0:
-                while self.current_color != None and self.green_count > 0:
-                    self.blue_condition.wait()
-                self.blue_count += 1
-                self.total_blue -=1
-                while self.current_color == "green":
-                     self.green_condition.wait()
-            if self.current_color == "green" and self.blue_count ==0:
-                while self.current_color != None and self.blue_count > 0:
-                        self.green_condition.wait()
-                while self.current_color == "blue":
-                     self.blue_condition.wait()
-                self.green_count += 1
-                self.total_green -=1
+class Person(threading.Thread):
+    def __init__(self, threadID, color):
+        threading.Thread.__init__(self)
+        self.threadID = threadID
+        self.color = color
 
-                    
+    def run(self):
+        enter(self.threadID, self.color)
+
+def enter(id, color):
+    global slots
+    global blue
+    global green
+    global bMax
+    global gMax
+    global currentColor
+    global currentInside
+    global greenCount
+    global blueCount
+    global oldMsg
+    global msgHolder
+
+    semaphore.acquire()
+
+    if (currentInside == 0):
+        if (oldMsg != str(currentColor) + " only"):
+            print(f"{currentColor} only")
+            oldMsg = str(currentColor) + " only"
+        else:
+            for msg in msgHolder:
+                print(msg)
+            msgHolder = []
             
-            self.current_count += 1
-            print(f"{threading.get_ident()} - {self.current_color}")
-    def leave(self):
-        with self.lock:
-            if self.current_count == self.slots or (self.total_green == 0 and self.current_color == 'green') or (self.total_blue == 0 and self.current_color == 'blue'):  
-                        self.past_color = self.current_color
-                        if self.current_color == "blue":
-                            self.current_color = "green"
-                            self.green_condition.notify_all()
-                        elif self.current_color == "green":
-                            self.current_color = "blue"
-                            self.blue_condition.notify_all()
-                        self.current_count = 0
-                        self.blue_count = 0
-                        self.green_count = 0
-                        
-                        
-                        print("Empty fitting room.") 
-def run(color, count, fitting_room):
-    for i in range(count):
-        fitting_room.enter()
-    for i in range(count):
-        fitting_room.leave()
-def main():
-    slots = int(input("Enter number of slots inside the fitting room: "))
-    blue = int(input("Enter number of Blues:"))
-    green = int(input("Enter number of Green:"))
-    fitting_room = FittingRoom(slots,blue,green)
-    blue_threads = [threading.Thread(target=run, args=("blue", 1, fitting_room)) for i in range(blue)]
-    green_threads = [threading.Thread(target=run, args=("green", 1, fitting_room)) for i in range(green)]
-    threads = blue_threads + green_threads
-    for thread in threads:
-        thread.start()
+    if (currentColor == "Blue" and blueCount <= bMax):
+        print(f"{currentColor} {blueCount} enters    (currently inside:{currentInside+1})")
+        msgHolder.append(f"{currentColor} {blueCount} exits")
+        blueCount += 1
+        currentInside += 1
+    elif (currentColor == "Green" and greenCount <= gMax):
+        print(f"{currentColor} {greenCount} enters    (currently inside:{currentInside+1})")
+        msgHolder.append(f"{currentColor} {greenCount} exits")
+        greenCount += 1
+        currentInside += 1
+    else:
+        # at this point slots (semaphore._value) is back to n, meaning no threads are acquiring a lock
+        # print(f"slots = {semaphore._value}")
+        for msg in msgHolder:
+            print(msg)
+        msgHolder = []
+        print("----Empty Fitting room.----  (currently inside:0)\n")
+        # print(f"slots = {semaphore._value}")
+        if currentColor == "Blue":
+            currentColor = "Green"
+            if (oldMsg != str(currentColor) + " only"):
+                print(f"{currentColor} only")
+                oldMsg = str(currentColor) + " only"
+            else:
+                for msg in msgHolder:
+                    print(msg)
+                msgHolder = []
+            print(f"{currentColor} {greenCount} enters    (currently inside:{currentInside+1})")
+            msgHolder.append(f"{currentColor} {greenCount} exits")
+            greenCount += 1
+        elif currentColor == "Green":
+            currentColor = "Blue"
+            if (oldMsg != str(currentColor) + " only"):
+                print(f"{currentColor} only")
+                oldMsg = str(currentColor) + " only"
+            else:
+                for msg in msgHolder:
+                    print(msg)
+                msgHolder = []
+            print(f"{currentColor} {blueCount} enters    (currently inside:{currentInside+1})")
+            msgHolder.append(f"{currentColor} {blueCount} exits")
+            blueCount += 1
+    
+    if (currentColor == "Blue"):
+        counter2 = blue
+    else:
+        counter2 = green
+        
+    if (currentInside == slots or currentInside >= counter2):
+        currentInside = 0
+        if (currentColor == "Blue" and greenCount-1 != gMax):
+            for msg in msgHolder:
+                print(msg)
+            msgHolder = []
+            print("----Empty Fitting room.----  (currently inside:0)\n") 
+            currentColor = "Green"
+        elif(currentColor == "Green" and blueCount-1 != bMax):
+            for msg in msgHolder:
+                print(msg)
+            msgHolder = []
+            print("----Empty Fitting room.----  (currently inside:0)\n") 
+            currentColor = "Blue"
+    time.sleep(2)
+    semaphore.release()
 
-    for thread in threads:
-        thread.join()
-if __name__ == '__main__':
-    main()
+slots = int(input("Enter number of slots inside the fitting room: "))
+blue = int(input("Enter number of Blues:"))
+green = int(input("Enter number of Green:"))
+
+semaphore = threading.BoundedSemaphore(value = slots)
+
+bMax = blue
+gMax = green
+currentInside = 0
+oldMsg = ""
+msgHolder = []
+blueCount = 1
+greenCount = 1
+
+people = []
+
+if(blue > green):
+    currentColor = "Blue"
+else:
+    currentColor = "Green"
+
+blue_threads = [Person(str(i), "Blue") for i in range(1, blue + 1)]
+green_threads = [Person(str(i), "Green") for i in range(1, green + 1)]
+
+for thread in blue_threads + green_threads:
+    thread.start()
+
+for thread in blue_threads + green_threads:
+    thread.join()
+
+while(True):
+    if (threading.active_count() == 1):
+        for msg in msgHolder:
+            print(msg)
+        msgHolder = []
+        print("----Empty Fitting room.----  (currently inside:0)")
+        break
+
