@@ -46,6 +46,7 @@ class FittingRoom(threading.Thread):
                         self.past_color = self.current_color
                         if self.current_color == "blue" and self.total_green > 0:
                             self.current_color = "green"
+                            
                             self.green_condition.notify_all()     
                         elif self.current_color == "green" and self.total_blue > 0:
                             self.current_color = "blue" 
@@ -55,7 +56,10 @@ class FittingRoom(threading.Thread):
                         self.green_count = 0
                           
                         
-                        print("Empty fitting room.") 
+                        print("Empty fitting room.")
+                        if (self.total_green != 0 and self.current_color == 'green') or (self.total_blue != 0 and self.current_color == 'blue'):
+                            print(f"{self.current_color} only")
+
                 self.sem2.release()
  
 
